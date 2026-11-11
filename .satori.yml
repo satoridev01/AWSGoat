@@ -1,0 +1,12 @@
+settings:
+  name: "AWSGoat: security checks"
+  description: "Static analysis of AWSGoat code, Terraform and secrets, plus ScoutSuite and Prowler audits of the AWS account where it is deployed"
+  files: true
+
+import:
+  - satori://secrets/trufflehog.yml
+  - satori://code/semgrep.yml
+  - satori://container/iac/checkov.yml
+  - satori://code/trivy.yml
+  - satori://cloud/aws-scoutsuite.yml
+  - satori://cloud/aws-prowler.yml
