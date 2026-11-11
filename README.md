@@ -114,6 +114,22 @@ terraform init
 terraform apply --auto-approve
 ```
 
+### Docker Installation
+
+Deploys from any host with Docker (Linux, macOS, Windows/WSL): Terraform, the AWS CLI and Python run inside a `linux/amd64` container, and the Terraform state is stored per module in a versioned S3 bucket (`awsgoat-tfstate-<account-id>`), so nothing is tied to the machine that ran the deploy.
+
+Credentials come from an AWS profile in `~/.aws` or from `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN`. Use a dedicated, isolated AWS account.
+
+```sh
+AWS_PROFILE=<profile> ./up.sh                    # deploy module-1 and module-2
+AWS_PROFILE=<profile> ./up.sh module-2           # deploy a single module
+AWS_PROFILE=<profile> ./down.sh                  # destroy everything
+AWS_PROFILE=<profile> ./deploy/run.sh status     # what is deployed, with URLs
+AWS_PROFILE=<profile> ./deploy/run.sh check      # list AWSGoat resources left in the account
+```
+
+`up.sh` skips modules that are already deployed (set `AWSGOAT_FORCE=1` to re-apply). `./deploy/run.sh tf <module> <terraform args>` runs any Terraform command against a module's state.
+
 # Modules
 
 ## Module 1

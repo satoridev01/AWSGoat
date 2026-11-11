@@ -26,7 +26,15 @@ resource "aws_lambda_function" "react_lambda_app" {
   handler       = "index.handler"
   runtime       = "nodejs18.x"
   role          = aws_iam_role.blog_app_lambda.arn
-  depends_on    = [data.archive_file.lambda_zip, null_resource.file_replacement_lambda_react]
+  depends_on    = [data.archive_file.lambda_zip, null_resource.file_replacement_lambda_react, aws_cloudwatch_log_group.lambda_logs]
+}
+
+/* Lambda log groups, managed here so that terraform destroy removes them
+   (otherwise Lambda creates them on first invocation and they outlive the lab). */
+resource "aws_cloudwatch_log_group" "lambda_logs" {
+  for_each          = toset(["blog-application", "blog-application-data"])
+  name              = "/aws/lambda/${each.key}"
+  retention_in_days = 7
 }
 
 
@@ -3086,7 +3094,7 @@ resource "aws_lambda_function" "lambda_ba_data" {
   handler       = "lambda_function.lambda_handler"
   runtime       = "python3.9"
   role          = aws_iam_role.blog_app_lambda_python.arn
-  depends_on    = [data.archive_file.lambda_zip_bap]
+  depends_on    = [data.archive_file.lambda_zip_bap, aws_cloudwatch_log_group.lambda_logs]
   layers        = [aws_lambda_layer_version.lambda_layer.arn]
   memory_size   = "256"
   environment {

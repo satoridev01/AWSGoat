@@ -10,7 +10,7 @@ docker build -q --platform linux/amd64 -t "$IMAGE" deploy >/dev/null
 
 args=(--rm --platform linux/amd64 -v "$PWD:/src:ro")
 [ -d "$HOME/.aws" ] && args+=(-v "$HOME/.aws:/root/.aws:ro")
-for v in AWS_PROFILE AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_REGION AWSGOAT_FORCE AWSGOAT_STATE_BUCKET; do
+for v in AWS_PROFILE AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN AWS_REGION AWSGOAT_FORCE AWSGOAT_STATE_BUCKET AWSGOAT_CHECK_IGNORE; do
   [ -n "${!v:-}" ] && args+=(-e "$v")
 done
 [ -t 1 ] && args+=(-t)
