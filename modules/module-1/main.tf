@@ -3574,15 +3574,6 @@ resource "aws_iam_policy" "goat_inline_policy_2" {
   })
 }
 
-data "template_file" "goat_script" {
-  template = file("resources/ec2/goat_user_data.tpl")
-  vars = {
-    S3_BUCKET_NAME = aws_s3_bucket.bucket_temp.bucket
-  }
-  depends_on = [aws_s3_bucket.bucket_temp]
-}
-
-
 data "aws_ami" "goat_ami" {
   most_recent = true
   filter {
@@ -3605,7 +3596,9 @@ resource "aws_instance" "goat_instance" {
   tags = {
     Name = "AWS_GOAT_DEV_INSTANCE"
   }
-  user_data = data.template_file.goat_script.rendered
+  user_data = templatefile("resources/ec2/goat_user_data.tpl", {
+    S3_BUCKET_NAME = aws_s3_bucket.bucket_temp.bucket
+  })
   depends_on = [
     aws_s3_object.upload_temp_object_2
   ]
