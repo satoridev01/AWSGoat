@@ -1,12 +1,7 @@
 settings:
   name: "AWSGoat: security checks"
-  description: "Static analysis of AWSGoat code, Terraform and secrets, plus ScoutSuite and Prowler audits of the AWS account where it is deployed"
   files: true
+  example: satori run satori://cloud/aws-prowler2.yml -d AWS_ACCESS_KEY="$(aws configure get aws_access_key_id --profile demo)" -d AWS_SECRET_KEY="$(aws configure get aws_secret_access_key --profile demo)" -d AWS_ACCOUNT_ID="$(aws sts get-caller-identity --profile demo --query Account --output text)" --report --output
 
 import:
-  - satori://secrets/trufflehog.yml
-  - satori://code/semgrep.yml
-  - satori://container/iac/checkov.yml
-  - satori://code/trivy.yml
-  - satori://cloud/aws-scoutsuite.yml
-  - satori://cloud/aws-prowler.yml
+  - satori://cloud/aws-prowler2.yml
