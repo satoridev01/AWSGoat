@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Creates/destroys the IAM identities used by the Prowler fork's `--verify` active
 # adapter/enricher tests (PacuPrivescAdapter, StratusS3ExfiltrationEnricher) and by
-# Prowler's own scans. Plain `aws iam` calls, no Terraform, so this stays outside
+# Prowler's own scans. "Target" here means the disposable IAM USER
+# PROWLER_VERIFY_ACTIVE_TARGET_USER attaches a flagged policy to -- not the AWS
+# ACCOUNT being audited (that's PROWLER_VERIFY_ALLOWED_ACCOUNT_IDS, unrelated).
+# Plain `aws iam` calls, no Terraform, so this stays outside
 # deploy/run.sh's Docker flow; both identities are cheap IAM metadata (no billable
 # resources). Kept in this repo, not created ad hoc, so the account is fully
 # reproducible from git on every up/down cycle.
@@ -11,8 +14,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-ATTACKER_USER=awsgoat-attacker
-ATTACKER_PROFILE=awsgoat-attacker
+TARGET_USER=awsgoat-privesc-test-user
+TARGET_PROFILE=awsgoat-privesc-test-user
 PROWLER_POLICY_NAME=ProwlerAdditionsReadOnly
 PROWLER_POLICY_DOC=deploy/policies/prowler-additions-readonly.json
 AUDIT_USER=satori-readonly-auditor
@@ -34,43 +37,44 @@ up() {
   aws iam attach-user-policy --user-name "$AUDIT_USER" --policy-arn "$POLICY_ARN"
   echo "attached to $AUDIT_USER"
 
-  log "$ATTACKER_USER (disposable pacu privesc target; baseline ViewOnlyAccess + SecurityAudit, no escalation path)"
-  if aws iam get-user --user-name "$ATTACKER_USER" >/dev/null 2>&1; then
+  log "$TARGET_USER (disposable test user for PacuPrivescAdapter's PROWLER_VERIFY_ACTIVE_TARGET_USER;
+      baseline ViewOnlyAccess + SecurityAudit, no escalation path of its own)"
+  if aws iam get-user --user-name "$TARGET_USER" >/dev/null 2>&1; then
     echo "user already exists"
   else
-    aws iam create-user --user-name "$ATTACKER_USER" >/dev/null
-    aws iam attach-user-policy --user-name "$ATTACKER_USER" --policy-arn arn:aws:iam::aws:policy/job-function/ViewOnlyAccess
-    aws iam attach-user-policy --user-name "$ATTACKER_USER" --policy-arn arn:aws:iam::aws:policy/SecurityAudit
+    aws iam create-user --user-name "$TARGET_USER" >/dev/null
+    aws iam attach-user-policy --user-name "$TARGET_USER" --policy-arn arn:aws:iam::aws:policy/job-function/ViewOnlyAccess
+    aws iam attach-user-policy --user-name "$TARGET_USER" --policy-arn arn:aws:iam::aws:policy/SecurityAudit
     echo "user created"
   fi
 
   # Rotate the access key every run (idempotent `up`, never leaves a stale key
   # behind) and write it straight to the local profile; the secret is never printed.
-  for k in $(aws iam list-access-keys --user-name "$ATTACKER_USER" --query 'AccessKeyMetadata[].AccessKeyId' --output text); do
-    aws iam delete-access-key --user-name "$ATTACKER_USER" --access-key-id "$k"
+  for k in $(aws iam list-access-keys --user-name "$TARGET_USER" --query 'AccessKeyMetadata[].AccessKeyId' --output text); do
+    aws iam delete-access-key --user-name "$TARGET_USER" --access-key-id "$k"
   done
   tmp=$(mktemp)
-  aws iam create-access-key --user-name "$ATTACKER_USER" --output json > "$tmp"
+  aws iam create-access-key --user-name "$TARGET_USER" --output json > "$tmp"
   python3 -c "
 import json, subprocess
 d = json.load(open('$tmp'))['AccessKey']
-subprocess.run(['aws', 'configure', 'set', 'aws_access_key_id', d['AccessKeyId'], '--profile', '$ATTACKER_PROFILE'], check=True)
-subprocess.run(['aws', 'configure', 'set', 'aws_secret_access_key', d['SecretAccessKey'], '--profile', '$ATTACKER_PROFILE'], check=True)
+subprocess.run(['aws', 'configure', 'set', 'aws_access_key_id', d['AccessKeyId'], '--profile', '$TARGET_PROFILE'], check=True)
+subprocess.run(['aws', 'configure', 'set', 'aws_secret_access_key', d['SecretAccessKey'], '--profile', '$TARGET_PROFILE'], check=True)
 "
   rm -f "$tmp"
-  aws configure set region us-east-1 --profile "$ATTACKER_PROFILE"
-  echo "local profile '$ATTACKER_PROFILE' written"
+  aws configure set region us-east-1 --profile "$TARGET_PROFILE"
+  echo "local profile '$TARGET_PROFILE' written"
 }
 
 down() {
-  log "$ATTACKER_USER"
-  if aws iam get-user --user-name "$ATTACKER_USER" >/dev/null 2>&1; then
-    aws iam detach-user-policy --user-name "$ATTACKER_USER" --policy-arn arn:aws:iam::aws:policy/job-function/ViewOnlyAccess 2>/dev/null || true
-    aws iam detach-user-policy --user-name "$ATTACKER_USER" --policy-arn arn:aws:iam::aws:policy/SecurityAudit 2>/dev/null || true
-    for k in $(aws iam list-access-keys --user-name "$ATTACKER_USER" --query 'AccessKeyMetadata[].AccessKeyId' --output text); do
-      aws iam delete-access-key --user-name "$ATTACKER_USER" --access-key-id "$k"
+  log "$TARGET_USER"
+  if aws iam get-user --user-name "$TARGET_USER" >/dev/null 2>&1; then
+    aws iam detach-user-policy --user-name "$TARGET_USER" --policy-arn arn:aws:iam::aws:policy/job-function/ViewOnlyAccess 2>/dev/null || true
+    aws iam detach-user-policy --user-name "$TARGET_USER" --policy-arn arn:aws:iam::aws:policy/SecurityAudit 2>/dev/null || true
+    for k in $(aws iam list-access-keys --user-name "$TARGET_USER" --query 'AccessKeyMetadata[].AccessKeyId' --output text); do
+      aws iam delete-access-key --user-name "$TARGET_USER" --access-key-id "$k"
     done
-    aws iam delete-user --user-name "$ATTACKER_USER"
+    aws iam delete-user --user-name "$TARGET_USER"
     echo "deleted"
   else
     echo "not present"
