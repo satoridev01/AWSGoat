@@ -15,7 +15,7 @@ ATTACKER_USER=awsgoat-attacker
 ATTACKER_PROFILE=awsgoat-attacker
 PROWLER_POLICY_NAME=ProwlerAdditionsReadOnly
 PROWLER_POLICY_DOC=deploy/policies/prowler-additions-readonly.json
-AUDIT_USER=satori-scout
+AUDIT_USER=satori-readonly-auditor
 
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 POLICY_ARN="arn:aws:iam::${ACCOUNT_ID}:policy/${PROWLER_POLICY_NAME}"
